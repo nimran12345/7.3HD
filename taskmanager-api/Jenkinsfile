@@ -25,15 +25,18 @@ pipeline {
         }
 
         stage('Test') {
-            steps {
-                echo "=== STAGE 2: TEST ==="
-                bat "docker run --rm --name taskmanager-test %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm install --include=dev && npm run test:ci\""
-            }
-            post {
-                success { echo "All tests passed" }
-                failure  { error "Tests failed" }
-            }
+    steps {
+        echo "=== STAGE 2: TEST ==="
+        dir('taskmanager-api') {
+            bat "docker build --no-cache -t %IMAGE_NAME%:%IMAGE_TAG%-test -f Dockerfile ."
+            bat "docker run --rm --name taskmanager-test %IMAGE_NAME%:%IMAGE_TAG%-test sh -c \"npm run test:ci\""
         }
+    }
+    post {
+        success { echo "All tests passed" }
+        failure  { error "Tests failed" }
+    }
+}
 
         stage('Code Quality') {
             steps {
