@@ -25,4 +25,11 @@ const taskRules = [
   body('due_date').optional().isISO8601().withMessage('due_date must be a valid ISO 8601 date')
 ];
 
-module.exports = { validate, registerRules, loginRules, taskRules };
+const updateTaskRules = [
+  body('title').optional({ checkFalsy: false }).trim().isLength({ min: 1, max: 200 }).withMessage('Title must be 1-200 characters'),
+  body('status').optional().isIn(['pending', 'in_progress', 'completed', 'cancelled']).withMessage('Invalid status value'),
+  body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority value'),
+  body('due_date').optional().isISO8601().withMessage('due_date must be a valid ISO 8601 date')
+];
+
+module.exports = { validate, registerRules, loginRules, taskRules, updateTaskRules };
