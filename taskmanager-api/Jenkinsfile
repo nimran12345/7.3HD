@@ -61,8 +61,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo "=== STAGE 5: DEPLOY TO STAGING ==="
-                bat "docker stop %CONTAINER_NAME% || true"
-                bat "docker rm %CONTAINER_NAME% || true"
+                bat "docker stop %CONTAINER_NAME% 2>nul & exit /b 0"
+                bat "docker rm %CONTAINER_NAME% 2>nul & exit /b 0"
                 bat "docker run -d --name %CONTAINER_NAME% -p 3000:3000 -e NODE_ENV=staging -e JWT_SECRET=staging-secret -e DB_PATH=/app/data/taskmanager.db -v taskmanager-staging-data:/app/data %IMAGE_NAME%:%IMAGE_TAG%"
                 sleep(time: 10, unit: 'SECONDS')
                 bat "docker exec %CONTAINER_NAME% wget -qO- http://localhost:3000/health"
@@ -77,8 +77,8 @@ pipeline {
             steps {
                 echo "=== STAGE 6: RELEASE TO PRODUCTION ==="
                 bat "docker tag %IMAGE_NAME%:%IMAGE_TAG% %IMAGE_NAME%:prod-%IMAGE_TAG%"
-                bat "docker stop %PROD_CONTAINER% || true"
-                bat "docker rm %PROD_CONTAINER% || true"
+                bat "docker stop %PROD_CONTAINER% 2>nul & exit /b 0"
+                bat "docker rm %PROD_CONTAINER% 2>nul & exit /b 0"
                 bat "docker run -d --name %PROD_CONTAINER% -p 3001:3000 -e NODE_ENV=production -e JWT_SECRET=prod-secret-key -e DB_PATH=/app/data/taskmanager.db -v taskmanager-prod-data:/app/data %IMAGE_NAME%:prod-%IMAGE_TAG%"
                 sleep(time: 10, unit: 'SECONDS')
                 bat "docker exec %PROD_CONTAINER% wget -qO- http://localhost:3000/health"
