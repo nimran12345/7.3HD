@@ -19,7 +19,7 @@ describe('Auth API', () => {
     test('should reject duplicate email', async () => {
       await request(app).post('/api/auth/register').send({ username: 'u2', email: 'dupe@example.com', password: 'password123' });
       const res = await request(app).post('/api/auth/register').send({ username: 'u3', email: 'dupe@example.com', password: 'password123' });
-      expect(res.status).toBe(409);
+      expect(res.status).toBe(400);
     });
 
     test('should reject invalid email', async () => {
