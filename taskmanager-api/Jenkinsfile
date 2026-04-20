@@ -14,7 +14,7 @@ pipeline {
             steps {
                 echo "=== STAGE 1: BUILD ==="
                 dir('taskmanager-api') {
-                    bat "docker build -t %IMAGE_NAME%:%IMAGE_TAG% -t %IMAGE_NAME%:latest ."
+                    bat "docker build --no-cache -t %IMAGE_NAME%:%IMAGE_TAG% -t %IMAGE_NAME%:latest ."
                     bat "docker images %IMAGE_NAME%"
                 }
             }
@@ -25,25 +25,20 @@ pipeline {
         }
 
         stage('Test') {
-    steps {
-        echo "=== STAGE 2: TEST ==="
-        dir('taskmanager-api') {
-            bat "docker build --no-cache -t %IMAGE_NAME%:%IMAGE_TAG%-test -f Dockerfile ."
-            bat "docker run --rm --name taskmanager-test %IMAGE_NAME%:%IMAGE_TAG%-test sh -c \"npm run test:ci\""
+            steps {
+                echo "=== STAGE 2: TEST ==="
+                bat "docker run --rm --name taskmanager-test %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm run test:ci\""
+            }
+            post {
+                success { echo "All tests passed" }
+                failure  { error "Tests failed" }
+            }
         }
-    }
-    post {
-        success { echo "All tests passed" }
-        failure  { error "Tests failed" }
-    }
-}
 
         stage('Code Quality') {
             steps {
                 echo "=== STAGE 3: CODE QUALITY ==="
-                dir('taskmanager-api') {
-                    bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm install --include=dev && npx eslint src/ --format compact || true\""
-                }
+                bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npx eslint src/ --format compact || true\""
                 echo "Code quality check complete"
             }
             post {
@@ -54,7 +49,7 @@ pipeline {
         stage('Security') {
             steps {
                 echo "=== STAGE 4: SECURITY ==="
-                bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm install --include=dev && npm audit --audit-level=high || true\""
+                bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm audit --audit-level=high || true\""
                 echo "--- Trivy image scan ---"
                 bat "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 0 --severity LOW,MEDIUM,HIGH,CRITICAL %IMAGE_NAME%:%IMAGE_TAG% || true"
             }
@@ -69,7 +64,7 @@ pipeline {
                 bat "docker stop %CONTAINER_NAME% || true"
                 bat "docker rm %CONTAINER_NAME% || true"
                 bat "docker run -d --name %CONTAINER_NAME% -p 3000:3000 -e NODE_ENV=staging -e JWT_SECRET=staging-secret -e DB_PATH=/app/data/taskmanager.db -v taskmanager-staging-data:/app/data %IMAGE_NAME%:%IMAGE_TAG%"
-                sleep(time: 8, unit: 'SECONDS')
+                sleep(time: 10, unit: 'SECONDS')
                 bat "docker exec %CONTAINER_NAME% wget -qO- http://localhost:3000/health"
             }
             post {
@@ -85,7 +80,7 @@ pipeline {
                 bat "docker stop %PROD_CONTAINER% || true"
                 bat "docker rm %PROD_CONTAINER% || true"
                 bat "docker run -d --name %PROD_CONTAINER% -p 3001:3000 -e NODE_ENV=production -e JWT_SECRET=prod-secret-key -e DB_PATH=/app/data/taskmanager.db -v taskmanager-prod-data:/app/data %IMAGE_NAME%:prod-%IMAGE_TAG%"
-                sleep(time: 8, unit: 'SECONDS')
+                sleep(time: 10, unit: 'SECONDS')
                 bat "docker exec %PROD_CONTAINER% wget -qO- http://localhost:3000/health"
             }
             post {
