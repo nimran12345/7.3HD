@@ -1,3 +1,122 @@
+// pipeline {
+//     agent any
+
+//     environment {
+//         IMAGE_NAME     = 'taskmanager-api'
+//         IMAGE_TAG      = "${env.BUILD_NUMBER}"
+//         CONTAINER_NAME = 'taskmanager-staging'
+//         PROD_CONTAINER = 'taskmanager-prod'
+//     }
+
+//     stages {
+
+//         stage('Build') {
+//             steps {
+//                 echo "=== STAGE 1: BUILD ==="
+//                 dir('taskmanager-api') {
+//                     bat "docker build -t %IMAGE_NAME%:%IMAGE_TAG% -t %IMAGE_NAME%:latest ."
+//                     bat "docker images %IMAGE_NAME%"
+//                 }
+//             }
+//             post {
+//                 success { echo "Image built: ${IMAGE_NAME}:${IMAGE_TAG}" }
+//                 failure { error "Build failed" }
+//             }
+//         }
+
+//         stage('Test') {
+//             steps {
+//                 echo "=== STAGE 2: TEST ==="
+//                 bat "docker run --rm --name taskmanager-test %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm run test:ci\""
+//             }
+//             post {
+//                 success { echo "All tests passed" }
+//                 failure  { error "Tests failed" }
+//             }
+//         }
+
+//         stage('Code Quality') {
+//             steps {
+//                 echo "=== STAGE 3: CODE QUALITY ==="
+//                 bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npx eslint src/ --format compact || true\""
+//                 echo "Code quality check complete"
+//             }
+//             post {
+//                 success { echo "Code quality passed" }
+//             }
+//         }
+
+//         stage('Security') {
+//             steps {
+//                 echo "=== STAGE 4: SECURITY ==="
+//                 bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm audit --audit-level=high || true\""
+//                 echo "--- Trivy image scan ---"
+//                 bat "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 0 --severity LOW,MEDIUM,HIGH,CRITICAL %IMAGE_NAME%:%IMAGE_TAG% || true"
+//             }
+//             post {
+//                 success { echo "Security scan complete" }
+//             }
+//         }
+
+//         stage('Deploy') {
+//             steps {
+//                 echo "=== STAGE 5: DEPLOY TO STAGING ==="
+//                 bat "docker stop %CONTAINER_NAME% 2>nul & exit /b 0"
+//                 bat "docker rm %CONTAINER_NAME% 2>nul & exit /b 0"
+//                 bat "docker run -d --name %CONTAINER_NAME% -p 3000:3000 -e NODE_ENV=staging -e JWT_SECRET=staging-secret -e DB_PATH=/app/data/taskmanager.db -v taskmanager-staging-data:/app/data %IMAGE_NAME%:%IMAGE_TAG%"
+//                 sleep(time: 10, unit: 'SECONDS')
+//                 bat "docker exec %CONTAINER_NAME% wget -qO- http://localhost:3000/health"
+//             }
+//             post {
+//                 success { echo "Deployed to staging on port 3000" }
+//                 failure  { error "Staging deployment failed" }
+//             }
+//         }
+
+//         stage('Release') {
+//             steps {
+//                 echo "=== STAGE 6: RELEASE TO PRODUCTION ==="
+//                 bat "docker tag %IMAGE_NAME%:%IMAGE_TAG% %IMAGE_NAME%:prod-%IMAGE_TAG%"
+//                 bat "docker stop %PROD_CONTAINER% 2>nul & exit /b 0"
+//                 bat "docker rm %PROD_CONTAINER% 2>nul & exit /b 0"
+//                 bat "docker run -d --name %PROD_CONTAINER% -p 3001:3000 -e NODE_ENV=production -e JWT_SECRET=prod-secret-key -e DB_PATH=/app/data/taskmanager.db -v taskmanager-prod-data:/app/data %IMAGE_NAME%:prod-%IMAGE_TAG%"
+//                 sleep(time: 10, unit: 'SECONDS')
+//                 bat "docker exec %PROD_CONTAINER% wget -qO- http://localhost:3000/health"
+//             }
+//             post {
+//                 success { echo "Released to production on port 3001" }
+//                 failure  { error "Production release failed" }
+//             }
+//         }
+
+//         stage('Monitoring') {
+//             steps {
+//                 echo "=== STAGE 7: MONITORING ==="
+//                 bat "docker exec %PROD_CONTAINER% wget -qO- http://localhost:3000/metrics"
+//                 bat "docker exec %PROD_CONTAINER% wget -qO- http://localhost:3000/health"
+//                 echo "Metrics endpoint verified"
+//                 echo "Prometheus: http://localhost:9090"
+//                 echo "Grafana:    http://localhost:3002"
+//             }
+//             post {
+//                 success { echo "Monitoring verified" }
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo "ALL 7 STAGES PASSED"
+//             echo "Staging:    http://localhost:3000"
+//             echo "Production: http://localhost:3001"
+//             echo "Grafana:    http://localhost:3002"
+//         }
+//         failure {
+//             echo "PIPELINE FAILED — check stage logs above"
+//         }
+//     }
+// }
+
 pipeline {
     agent any
 
@@ -51,10 +170,12 @@ pipeline {
                 echo "=== STAGE 4: SECURITY ==="
                 bat "docker run --rm %IMAGE_NAME%:%IMAGE_TAG% sh -c \"npm audit --audit-level=high || true\""
                 echo "--- Trivy image scan ---"
-                bat "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 0 --severity LOW,MEDIUM,HIGH,CRITICAL %IMAGE_NAME%:%IMAGE_TAG% || true"
+                bat "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 0 --timeout 300s --severity LOW,MEDIUM,HIGH,CRITICAL %IMAGE_NAME%:%IMAGE_TAG%"
+                echo "Security scan complete"
             }
             post {
                 success { echo "Security scan complete" }
+                failure { echo "Security scan had issues but continuing" }
             }
         }
 
